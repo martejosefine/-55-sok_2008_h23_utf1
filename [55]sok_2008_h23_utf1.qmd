@@ -1,0 +1,236 @@
+---
+title: "[55]sok_2008_h23_utf1"
+author: “[55]”
+format: pdf
+echo: true
+output: true
+---
+
+## Quarto
+
+Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+
+## Running Code
+
+When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+
+```{r}
+rm(list = ls())
+```
+
+You can add options to executable code like this
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(rjstat)
+library(janitor)
+library(gdata)
+library(httr)
+```
+
+### Oppgave 1.1.1
+
+```{r}
+url <- "https://data.ssb.no/api/v0/no/table/04544/"
+
+query <- '{
+  "query": [
+    {
+      "code": "Kjonn",
+      "selection": {
+        "filter": "item",
+        "values": [
+          "1",
+          "2"
+        ]
+      }
+    },
+    {
+      "code": "Yrkesstatus",
+      "selection": {
+        "filter": "item",
+        "values": [
+          "00"
+        ]
+      }
+    },
+    {
+      "code": "ContentsCode",
+      "selection": {
+        "filter": "item",
+        "values": [
+          "FaktiskArbeidstid"
+        ]
+      }
+    }
+  ],
+  "response": {
+    "format": "json-stat2"
+  }
+}'
+
+hent_indeks.tmp <- url %>%
+  POST(body = query, encode = "json")
+
+df <-  hent_indeks.tmp %>%
+  content("text") %>%
+  fromJSONstat() %>%
+  as_tibble()
+
+navn <- unique(df$statistikkvariabel)
+```
+
+```{r}
+
+df$år <- as.numeric(df$år)
+
+```
+
+```{r}
+df %>%
+  ggplot(aes(x=år,y=value, color=kjønn, group=kjønn)) +
+  geom_line() +
+  scale_x_continuous(breaks=seq(1996, 2022, 2)) +
+  labs(x="Årstall", y="Faktisk arbeidstid (antall timer per uke)", title="Faktisk arbeidstid (timer per uke) etter kjønn") +
+  theme_bw()
+```
+
+```{r}
+suppressPackageStartupMessages(library(tidyverse))
+
+
+l_1 <- seq(0, 85, by = .001)
+
+
+df <- data.frame(l_1)
+
+#lag aksen for tegningen
+
+axes_1 <- ggplot(df, aes(l_1))+
+  labs(x="Fritid", y="Konsum i 10-tall") +
+  theme(axis.title = element_text(size = 15),
+        plot.title = element_text(size = 15),
+        panel.background = element_blank(), # hvit bakgrunn
+        axis.line = element_line(colour = "black"), # sett inn akselinjer
+        axis.title.x = element_text(hjust = 1),
+        axis.title.y = element_text(angle = 0, vjust = 1, hjust=1))+ # juster labels på aksene  
+  coord_fixed(ratio = 1)+ # lik skala for x og y aksen
+  scale_x_continuous(limits = c(0, 100), expand = c(0, 0))+
+  scale_y_continuous(limits = c(0, 350), expand = c(0, 0))+ # begrense aksene
+  coord_fixed(ratio = (100 - 0) / (350 - 0)) 
+# og sikre at akselinjene møttes i (0,0).
+
+# nyttefunkjsonen som brukes U=c^.5x l^.5 (Cobb-Douglas)
+
+# vi angir noen indifferenskurver
+I_0 <- function(l_1) (91.03061^2)/(l_1)  # nytte = 91.03061
+I_1 <- function(l_1) (98.03061^2)/(l_1) # nytte = 98.03061
+I_2 <- function(l_1) (110^2)/(l_1)  # nytte = 110
+
+figur_1 <- axes_1 +
+    stat_function(df,
+        fun=I_0,
+        mapping = aes()
+        ) +
+  stat_function(df,
+        fun=I_1,
+        mapping = aes()
+        ) +
+  stat_function(df,
+                fun=I_2,
+                mapping = aes()
+  ) +
+  annotate("text",x=90,y=100, label=expression(u[0]))+
+  annotate("text",x=90,y=115, label=expression(u[1]))+
+  annotate("text",x=90,y=145, label=expression(u[2]))
+
+figur_1
+```
+
+```{r}
+# w=2.5, m=100, T = 84 (7*12) (lønn og arbeidsfri inntekt i ti-tall)
+# Budget constraint function
+budget_constraint <- function(l_1) {
+  return(310 - 2.5 * l_1)
+}
+
+
+figur_2 <- axes_1+
+  geom_segment(aes(x = 0, y = budget_constraint(0), xend = 84, yend = budget_constraint(84))) +
+  annotate("text",x=15,y=310, label="c = m+wT")+
+  geom_segment(aes(x=5, y=310, xend=0, yend=310),
+               arrow = arrow(length = unit(0.25, "cm")))+
+  geom_segment(aes(x=84, y=0, xend=84, yend=100))+
+  geom_segment(aes(x=0, y=100, xend=84, yend=100), linetype="dashed")+
+   annotate("text",x=25,y=80, label="m = arbeidsfri inntekt")+
+  geom_segment(aes(x=25, y=90, xend=25, yend=100),
+               arrow = arrow(length = unit(0.25, "cm")))
+
+figur_2
+```
+
+### Oppgave 1.1.2
+
+```{r}
+#Henter inn data fra OECD
+
+url_oecd <- 
+  "https://raw.githubusercontent.com/uit-sok-2008-h23/uit-sok-2008-h23.github.io/main/assets/women.csv"
+
+df_oecd <- url_oecd %>%
+  read.csv(sep=";")
+```
+
+```{r}
+df_oecd %>%
+  ggplot(aes(x=as.character(tot_full_rate), y=fem_emp_rate_0_2)) +
+  geom_point() +
+  scale_y_continuous(limits=c(0,100)) +
+  labs(x="Antall foreldrepermisjonsuker med full støtte", y="Sysselsettingsrate", title="Sysselsetting blant kvinner med barn mellom 0-2 år \n sett i forhold til antall uker med rett til 100% foreldrepermisjonsstøtte") 
+```
+
+```{r}
+df_oecd %>%
+  ggplot(aes(x=as.character(tot_full_rate), y=fem_emp_rate_6_14)) +
+  geom_point() +
+  scale_y_continuous(limits=c(0,100)) +
+  labs(x="Antall foreldrepermisjonsuker med full støtte", y="Sysselsettingsrate", title="Sysselsetting blant kvinner med barn mellom 6-14 år \n sett i forhold til antall uker med rett til 100% foreldrepermisjonsstøtte") 
+```
+
+### Oppgave 1.1.3
+
+Høye barnetall er viktig for at en velferdsstat skal kunne opprettholde befolkningstallet. Utfordringen når fødselstallene synker er at befolkningen vil eldes, altså vil færre unge mennesker kommer til samtidig som den eksisterende befolkningen blir eldre. Dette fører til at forsørgelsesbyrden vil bli større ettersom man får færre yrkesaktive skattebetalere per innbygger utenfor arbeidsfør alder.
+
+### Oppgave 1.2
+
+```{r}
+library(eurostat)
+```
+
+```{r}
+df_eurostat <- get_eurostat("hlth_sha11_hf")
+```
+
+```{r}
+df_eurostat <- df_eurostat %>%
+  filter(time >= as.Date("2019-01-01"), time <= as.Date("2019-12-31")) %>%
+  filter(unit %in% c("PPS_HAB", "EUR_HAB")) %>%
+  filter(icha11_hf == "HF3") %>%
+  subset(!(geo %in% c('EA18', 'EA19', 'EU27_2020', "EU28")))
+
+```
+
+```{r}
+df_eurostat <- df_eurostat %>% 
+  pivot_wider(names_from = unit, values_from = values)
+```
+
+```{r}
+df_eurostat %>%
+  subset(!(geo %in% c('EA18', 'EA19', 'EU27_2020', "EU28"))) %>%
+  replace(is.na(.), 0) %>%
+  ggplot(aes(x=EUR_HAB,y=PPS_HAB, color=geo)) +
+  geom_point() +
+  labs(x="Andel egenbetaling per innbygger", y="Forbruk av helsetjenester per innbygger", color="Land:")
+```
